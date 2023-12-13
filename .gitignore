@@ -1,0 +1,5 @@
+# Ignore the snapshot file that contains the bulb info
+/snapshot.json
+
+# Ignore the pycache files
+*.pyc
