@@ -31,9 +31,9 @@ Notes and TODOs:
     so don't run it on a busy network or one with untrusted devices.
 
 - I'm setting this up for holiday displays (along with other things), but I haven't
-    verified the security of the bulbs, nor how much is tracked (beyond a brief network 
-    packet check). I'm not sure if I'll keep them up year-long, so use at your own 
-    discretion, as you should with all IoT devices.
+    verified the security of the bulbs. However, I know that they constantly send
+    data back to Tuya, which I plan on blocking, if possible. If not, I won't keep them 
+    up year-long, so use at your own discretion, as you should with all IoT devices.
 
-- I haven't added the scenes to the re-write yet, but I at least plan on adding an
-    Xmas one soon, as well as an improved version of the lightning flash.
+- I've started adding scenes, but I'm going to move them into a separate module, as I 
+    don't want bulb names included in the main one.
