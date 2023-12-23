@@ -10,10 +10,12 @@
 
 import json
 import tinytuya
-from time import sleep
-from fastapi import FastAPI
+from time import sleep, time, ctime
+from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 import os, sys, threading
+import asyncio
+from random import random
 
 app = FastAPI()
 
@@ -38,10 +40,7 @@ class BulbObject:
         )
 
 bulbs : BulbObject = []
-current_thread: threading.Thread
-running_threads = [
-
-]
+running_scenes = []
 
 # set path of snapshot file here, or place a copy into this folder
 snapshot = os.path.join(sys.path[0], 'snapshot.json')
@@ -57,9 +56,11 @@ for bulb in bulb_json['devices']:
     version_in=bulb['ver']
 ))
     
-for this_bulb in bulbs:
-    this_bulb.bulb.set_socketPersistent(True)
-    this_bulb.bulb.set_socketRetryLimit(RETRY_LIMIT)
+def set_bulb_retry_limit(limit):
+    for this_bulb in bulbs:
+        this_bulb.bulb.set_socketRetryLimit(limit)
+
+set_bulb_retry_limit(RETRY_LIMIT)
 
 # Compile all the bulbs into a list with a true or false toggle
 # This list will be added to the JSON classes below
@@ -114,25 +115,34 @@ class BrightnessClass(BaseModel):
 # Scenes
 
 def stop_scenes():
-    if len(running_threads) > 0: 
-        running_threads.clear()
-        current_thread.join()
+    if len(running_scenes) > 0: 
+        running_scenes.clear()
+        sleep(2) # gives time for scene to end before next command
     
-def xmas_scene():
-    sleep_time = 10
-    thread_name = 'xmas_scene'
-    running_threads.append(thread_name)
-    number_of_bulbs = len(bulbs)
-    while thread_name in running_threads:
+async def xmas_scene(wait_time: int):
+    scene_id = random()
+    current_time = time()
+    light_red = True
+    print("{} : Wait {} : Started at {}".format(scene_id, wait_time, ctime(current_time)))
+    running_scenes.append(scene_id)
+    set_bulb_retry_limit(10) # ensures bulb reponds if wait time is high
+    
+    while scene_id in running_scenes:
         for this_bulb in bulbs:
-            if this_bulb.name.__contains__("Light"): this_bulb.bulb.set_colour(255, 0, 0)
-            else: this_bulb.bulb.set_colour(0, 100, 0)
-        sleep(sleep_time)
-        for this_bulb in bulbs:
-            if this_bulb.name.__contains__("Light"): this_bulb.bulb.set_colour(0, 255, 0)
-            else: this_bulb.bulb.set_colour(255, 0, 0)
-        sleep(sleep_time)
+            if light_red == True:
+                if this_bulb.name.__contains__("Light"): this_bulb.bulb.set_colour(255, 0, 0)
+                else: this_bulb.bulb.set_colour(0, 100, 0)
+            else:
+                if this_bulb.name.__contains__("Light"): this_bulb.bulb.set_colour(0, 255, 0)
+                else: this_bulb.bulb.set_colour(100, 0, 0)
+        print("Light Red = {} at {}".format(light_red, ctime(time())))
+        light_red = not light_red
+        while time() - current_time < wait_time and scene_id in running_scenes:
+            await asyncio.sleep(0.1)
+        current_time = time()
 
+    print("{} : Wait {} : Stopped at {}".format(scene_id, wait_time, ctime(current_time)))
+    set_bulb_retry_limit(1)
 
 # API endpoints
 
@@ -193,19 +203,9 @@ def set_xmas_colours():
 
     return "Xmas colours set"
 
-@app.put("/start_xmas_scene")
-def start_xmas_scene():
-    global current_thread
+@app.post("/start_xmas_scene")
+async def start_xmas_scene(wait_time: int, background_tasks: BackgroundTasks):
     stop_scenes()
-    current_thread = threading.Thread(target=xmas_scene)
-    current_thread.start()
+    background_tasks.add_task(xmas_scene, wait_time)
 
     return "Xmas Scene Started"
-
-@app.put("/list_threads")
-def list_current_threads():
-    threads = []
-    for thread in threading.enumerate(): 
-        threads.append(thread.name)
-    
-    return threads + running_threads
