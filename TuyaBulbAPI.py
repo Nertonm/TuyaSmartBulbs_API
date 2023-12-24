@@ -112,6 +112,9 @@ class BrightnessClass(BaseModel):
     brightness: int
     toggles: list = bulb_toggles
 
+class XmasSceneClass(BaseModel):
+    wait_time: int = 600
+
 # Scenes
 
 def stop_scenes():
@@ -204,8 +207,8 @@ def set_xmas_colours():
     return "Xmas colours set"
 
 @app.post("/start_xmas_scene")
-async def start_xmas_scene(wait_time: int, background_tasks: BackgroundTasks):
+async def start_xmas_scene(xmas_class: XmasSceneClass, background_tasks: BackgroundTasks):
     stop_scenes()
-    background_tasks.add_task(xmas_scene, wait_time)
+    background_tasks.add_task(xmas_scene, xmas_class.wait_time)
 
     return "Xmas Scene Started"
