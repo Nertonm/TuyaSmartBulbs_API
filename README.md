@@ -1,7 +1,8 @@
 # Tuya Smart Bulbs API
 
 This is an API for Tuya-powered Smart Bulbs, using FastAPI, uvicorn, and TinyTuya. At the moment
-it's very minimal, triggering some of the standard bulb commands, but I plan on adding more.
+it's very minimal, triggering some of the standard bulb commands and few scenes, but I plan 
+on adding more.
 
 The bulbs I'm using are e-luminate Smart Candle E14, as well as a couple of other Tuya-powered
 models. Intstructions for setting up the bulbs and getting the dev keys can be found at 
@@ -20,9 +21,6 @@ https://github.com/TimboFimbo/Pico_TuyaBulb_Remote
 
 Notes and TODOs:
 
-- Once you've registered the bulbs, ensure you add the IDs, IP addresses, and keys, and 
-    firmare version numbers to the BulbDevice objects at the top of the script.
-
 - It doesn't always wait for a response from the bulbs, in order to speed things up.
     However, this means some commands are missed - I may fix it, but for now some
     commands may have to be input twice.
@@ -36,4 +34,9 @@ Notes and TODOs:
     up year-long, so use at your own discretion, as you should with all IoT devices.
 
 - I've started adding scenes, but I'm going to move them into a separate module, as I 
-    don't want bulb names included in the main one.
+    don't want bulb names included in the main one. Check the comments within the script
+    for info on how to use them. I plan on changing pre-set scenes, such as the Xmas one,
+    to trigger existing scenes with pre-set values, rather than have their own methods.
+
+- The script is getting a little long, so I'll split it up into separate files at some
+    point, once I figure out the best way of structuring them.

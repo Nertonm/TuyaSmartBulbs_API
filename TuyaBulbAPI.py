@@ -28,6 +28,37 @@ app = FastAPI()
 CON_TIMEOUT = 2
 RETRY_LIMIT = 1
 
+# Colours - this is the best way of displaying them
+
+WHITE = {
+    "red": 255,
+    "green": 255,
+    "blue": 255
+}
+RED = {
+    "red": 255,
+    "green": 0,
+    "blue": 0
+}
+GREEN = {
+    "red": 0,
+    "green": 255,
+    "blue": 0
+}
+BLUE = {
+    "red": 0,
+    "green": 0,
+    "blue": 255
+}
+
+# And let's get the bulb names right, as they are sometimes used
+WHITE_LAMP = "White Lamp"
+WOOD_LAMP = "Wood Lamp"
+BLACK_LAMP = "Black Lamp"
+DEN_LIGHT = "Den Light"
+CHAIR_LIGHT = "Chair Light"
+SOFA_LIGHT = "Sofa Light"
+
 class BulbObject:
     def __init__(self, name_in, dev_id_in, address_in, local_key_in, version_in):
         self.name = name_in
@@ -115,6 +146,13 @@ class BrightnessClass(BaseModel):
 class XmasSceneClass(BaseModel):
     wait_time: int = 600
 
+# the bulb lists and colours are examples, which start the Xmas scene by default
+class MultiColourSceneClass(BaseModel):
+    bulb_lists: list = [[WHITE_LAMP, WOOD_LAMP, BLACK_LAMP],
+                       [DEN_LIGHT, CHAIR_LIGHT, SOFA_LIGHT]]
+    colour_list: list = [RED, GREEN]
+    wait_time: int = 600
+
 # Scenes
 
 def stop_scenes():
@@ -145,6 +183,56 @@ async def xmas_scene(wait_time: int):
         current_time = time()
 
     print("{} : Wait {} : Stopped at {}".format(scene_id, wait_time, ctime(current_time)))
+    set_bulb_retry_limit(1)
+
+async def multi_colour_scene(multi_class: MultiColourSceneClass):
+    scene_id = random()
+    current_time = time()
+    colour_offsets = []
+    b_list_length = len(multi_class.bulb_lists)
+    c_list_length = len(multi_class.colour_list)
+    print("{} : Wait {} : Started at {}"
+          .format(scene_id, multi_class.wait_time, ctime(current_time)))
+    running_scenes.append(scene_id)
+    set_bulb_retry_limit(10)
+
+    for i in range(b_list_length):
+        colour_offsets.append(i)
+    
+    if c_list_length < b_list_length:
+        for x in range(b_list_length - c_list_length):
+            multi_class.colour_list.append(WHITE)
+            c_list_length = len(multi_class.colour_list)
+    
+    # yeah, there are C-stye loops here. I have to sync up two lists and just find this way easier
+    # there are also a bunch of print lines for debugging, but they can be removed if desired
+    while scene_id in running_scenes:
+        for i in range(b_list_length):
+            for j in multi_class.bulb_lists[i]:
+                for this_bulb in bulbs:
+                    if this_bulb.name == j:
+                        col = multi_class.colour_list[colour_offsets[i]]
+                        this_bulb.bulb.set_colour(col['red'], col['green'], col['blue'])
+                        print("{} set to ({}, {}, {})".format(this_bulb.name, col['red'], col['green'], col['blue']))
+ 
+        count = 0
+
+        for i in range(len(colour_offsets)):
+            print ("Offset {} start: {}".format(str(i), str(colour_offsets[i])))
+            colour_offsets[i] = colour_offsets[i] + 1
+            print ("Offset {} + 1: {}".format(str(i), str(colour_offsets[i])))
+            if colour_offsets[i] >= c_list_length:
+                colour_offsets[i] = 0
+            print ("Offset {} final: {}".format(str(i), str(colour_offsets[i])))
+
+        print("Offsets: {}".format(colour_offsets))
+
+        while time() - current_time < multi_class.wait_time and scene_id in running_scenes:
+            await asyncio.sleep(0.1)
+        current_time = time()
+
+    print("{} : Wait {} : Stopped at {}"
+          .format(scene_id, multi_class.wait_time, ctime(current_time)))
     set_bulb_retry_limit(1)
 
 # API endpoints
@@ -191,7 +279,33 @@ def set_bulb_brightness(brightness_in: BrightnessClass):
 
     return "Brightness changed to {}".format(brightness_in.brightness)
 
-# Scenes - move these to another file
+# Scene endpoints
+
+# This one is a little more complex - You pass in multiple lists of bulbs (no repeats bulbs 
+# between lists), along with a list of colours. The lists of bulbs will cycle though the 
+# colour list at the wait time provided, with all bulbs in each list staying in sync. Having
+# more colours than bulb lists is fine - you just won't see all the colours at once. Having
+# more bulb lists than colours uses white as default for the missing ones, letting you know
+# you are missing some colours without the application crashing. Check the default in the API
+# for an example (triggers the Xmas scene - cycling two lists of bulbs between red and green).
+
+@app.post("/start_multi_colour_scene")
+def start_multi_colour_scene(multi_class: MultiColourSceneClass, background_tasks: BackgroundTasks):
+    # Check that no lights appear in multiple lists
+    duplicate_bulb = ""
+    for i in range(len(multi_class.bulb_lists)):
+        for j in range(len(multi_class.bulb_lists)):
+            for bulb in multi_class.bulb_lists[i]:
+                if bulb in multi_class.bulb_lists[j] and i != j:
+                    duplicate_bulb = bulb
+
+    if duplicate_bulb == "":
+        stop_scenes()
+        background_tasks.add_task(multi_colour_scene, multi_class)
+
+    return "Multi Colour Scene started" if duplicate_bulb == "" else "{} appears on multiple lists".format(duplicate_bulb)
+
+# Scene triggers - move these to another file / change to activate existing methods
 
 @app.put("/set_xmas_colours")
 def set_xmas_colours():
