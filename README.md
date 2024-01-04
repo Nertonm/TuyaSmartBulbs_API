@@ -9,8 +9,8 @@ models. Intstructions for setting up the bulbs and getting the dev keys can be f
 https://pypi.org/project/tinytuya/ - once you have the demo API working, getting this one 
 going should be fairly straightforward.
 
-UPDATE: I was learning as I was working on it, and it became such as mess of hard-coded
-names and weird functions that it needed a re-write. It's much better now - all it needs 
+I was learning as I was working on it, and it became such as mess of hard-coded names 
+and weird functions that it needed a re-write. It's much better now - all it needs 
 is a copy of the snapshot.json file that's generated when you set up the bulbs, and
 the rest is done dynamically: No bulb naming, no synching, and much easier to follow.
 Instead of updating, I replaced the repository, as the old one was terrible and would

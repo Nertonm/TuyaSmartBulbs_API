@@ -15,7 +15,8 @@ from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 import os, sys, threading
 import asyncio
-from random import random
+from random import random, choice
+import Colours
 
 app = FastAPI()
 
@@ -28,30 +29,7 @@ app = FastAPI()
 CON_TIMEOUT = 2
 RETRY_LIMIT = 1
 
-# Colours - this is the best way of displaying them
-
-WHITE = {
-    "red": 255,
-    "green": 255,
-    "blue": 255
-}
-RED = {
-    "red": 255,
-    "green": 0,
-    "blue": 0
-}
-GREEN = {
-    "red": 0,
-    "green": 255,
-    "blue": 0
-}
-BLUE = {
-    "red": 0,
-    "green": 0,
-    "blue": 255
-}
-
-# And let's get the bulb names right, as they are sometimes used
+# Let's get the bulb names right, as they are sometimes used
 WHITE_LAMP = "White Lamp"
 WOOD_LAMP = "Wood Lamp"
 BLACK_LAMP = "Black Lamp"
@@ -143,14 +121,23 @@ class BrightnessClass(BaseModel):
     brightness: int
     toggles: list = bulb_toggles
 
+class RandomColourSceneClass(BaseModel):
+    global bulb_toggles
+    wait_time: int = 600
+    toggles: list = bulb_toggles
+
 class XmasSceneClass(BaseModel):
     wait_time: int = 600
 
-# the bulb lists and colours are examples, which start the Xmas scene by default
+# the bulb lists and colours are examples, which starts a scene by default
 class MultiColourSceneClass(BaseModel):
-    bulb_lists: list = [[WHITE_LAMP, WOOD_LAMP, BLACK_LAMP],
-                       [DEN_LIGHT, CHAIR_LIGHT, SOFA_LIGHT]]
-    colour_list: list = [RED, GREEN]
+    bulb_lists: list = [[DEN_LIGHT, CHAIR_LIGHT, SOFA_LIGHT],
+                       [WHITE_LAMP, WOOD_LAMP, BLACK_LAMP]]
+    colour_list: list = [Colours.ORANGE,
+                         Colours.ROSE,
+                         Colours.AZURE,
+                         Colours.CHARTRUESE,
+                         Colours.VIOLET]
     wait_time: int = 600
 
 # Scenes
@@ -164,7 +151,7 @@ async def xmas_scene(wait_time: int):
     scene_id = random()
     current_time = time()
     light_red = True
-    print("{} : Wait {} : Started at {}".format(scene_id, wait_time, ctime(current_time)))
+    print("{} : Wait {} : Started at {}".format("xmas_scene", wait_time, ctime(current_time)))
     running_scenes.append(scene_id)
     set_bulb_retry_limit(10) # ensures bulb reponds if wait time is high
     
@@ -182,7 +169,7 @@ async def xmas_scene(wait_time: int):
             await asyncio.sleep(0.1)
         current_time = time()
 
-    print("{} : Wait {} : Stopped at {}".format(scene_id, wait_time, ctime(current_time)))
+    print("{} : Wait {} : Stopped at {}".format("xmas_scene", wait_time, ctime(current_time)))
     set_bulb_retry_limit(1)
 
 async def multi_colour_scene(multi_class: MultiColourSceneClass):
@@ -192,7 +179,7 @@ async def multi_colour_scene(multi_class: MultiColourSceneClass):
     b_list_length = len(multi_class.bulb_lists)
     c_list_length = len(multi_class.colour_list)
     print("{} : Wait {} : Started at {}"
-          .format(scene_id, multi_class.wait_time, ctime(current_time)))
+          .format("multi_colour_scene", multi_class.wait_time, ctime(current_time)))
     running_scenes.append(scene_id)
     set_bulb_retry_limit(10)
 
@@ -201,7 +188,7 @@ async def multi_colour_scene(multi_class: MultiColourSceneClass):
     
     if c_list_length < b_list_length:
         for x in range(b_list_length - c_list_length):
-            multi_class.colour_list.append(WHITE)
+            multi_class.colour_list.append(Colours.WHITE)
             c_list_length = len(multi_class.colour_list)
     
     # yeah, there are C-stye loops here. I have to sync up two lists and just find this way easier
@@ -226,13 +213,40 @@ async def multi_colour_scene(multi_class: MultiColourSceneClass):
             print ("Offset {} final: {}".format(str(i), str(colour_offsets[i])))
 
         print("Offsets: {}".format(colour_offsets))
+        print()
 
         while time() - current_time < multi_class.wait_time and scene_id in running_scenes:
             await asyncio.sleep(0.1)
         current_time = time()
 
     print("{} : Wait {} : Stopped at {}"
-          .format(scene_id, multi_class.wait_time, ctime(current_time)))
+          .format("multi_colour_scene", multi_class.wait_time, ctime(current_time)))
+    set_bulb_retry_limit(1)
+
+async def random_colour_scene(random_class: RandomColourSceneClass):
+    scene_id = random()
+    current_time = time()
+    print("{} : Wait {} : Started at {}"
+          .format("random_colour_scene", random_class.wait_time, ctime(current_time)))
+    running_scenes.append(scene_id)
+    set_bulb_retry_limit(10) # ensures bulb reponds if wait time is high
+
+    while scene_id in running_scenes:
+        for this_bulb in bulbs:
+            for this_toggle in random_class.toggles:
+                if this_toggle['name'] == this_bulb.name and this_toggle['toggle'] == True:
+                    ran_col = choice(Colours.ALL_COLOURS)
+                    this_bulb.bulb.set_colour(ran_col["red"], ran_col["green"], ran_col["blue"])
+                    print("{} set to ({}, {}, {})"
+                          .format(this_bulb.name, ran_col["red"], ran_col["green"], ran_col["blue"]))
+                    
+        print()
+        while time() - current_time < random_class.wait_time and scene_id in running_scenes:
+            await asyncio.sleep(0.1)
+        current_time = time()
+
+    print("{} : Wait {} : Stopped at {}"
+          .format("random_colour_scene", random_class.wait_time, ctime(current_time)))
     set_bulb_retry_limit(1)
 
 # API endpoints
@@ -287,7 +301,7 @@ def set_bulb_brightness(brightness_in: BrightnessClass):
 # more colours than bulb lists is fine - you just won't see all the colours at once. Having
 # more bulb lists than colours uses white as default for the missing ones, letting you know
 # you are missing some colours without the application crashing. Check the default in the API
-# for an example (triggers the Xmas scene - cycling two lists of bulbs between red and green).
+# for an example (triggers a scene that cycles though five colors).
 
 @app.post("/start_multi_colour_scene")
 def start_multi_colour_scene(multi_class: MultiColourSceneClass, background_tasks: BackgroundTasks):
@@ -304,6 +318,16 @@ def start_multi_colour_scene(multi_class: MultiColourSceneClass, background_task
         background_tasks.add_task(multi_colour_scene, multi_class)
 
     return "Multi Colour Scene started" if duplicate_bulb == "" else "{} appears on multiple lists".format(duplicate_bulb)
+
+# This one picks a random colour for each selected bulb at the selected wait time
+# For now, it uses the entire list of colours, but the option to toggle them will be added
+
+@app.post("/start_random_colour_scene")
+def start_random_colour_scene(random_class: RandomColourSceneClass, background_tasks: BackgroundTasks):
+    stop_scenes()
+    background_tasks.add_task(random_colour_scene, random_class)
+
+    return "Random Colour Scene started"
 
 # Scene triggers - move these to another file / change to activate existing methods
 
