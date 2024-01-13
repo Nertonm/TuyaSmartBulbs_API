@@ -84,8 +84,14 @@ class MultiRgbToggle(BulbToggle):
     green: int
     blue: int
 
+class RgbColour(BaseModel):
+    red: int
+    green: int
+    blue: int
+
 bulb_toggles : BulbToggle = []
 multi_rgb_toggles : MultiRgbToggle = []
+all_colours: RgbColour = []
 
 for this_bulb in bulbs:
     bulb_toggles.append(BulbToggle(
@@ -97,6 +103,13 @@ for this_bulb in bulbs:
         red = 0,
         green = 0,
         blue = 0
+    ))
+
+for col in Colours.ALL_COLOURS:
+    all_colours.append(RgbColour(
+        red = col["red"],
+        green = col["green"],
+        blue = col["blue"]
     ))
 
 # TODO add 'no_wait'
@@ -125,20 +138,21 @@ class RandomColourSceneClass(BaseModel):
     global bulb_toggles
     wait_time: int = 600
     toggles: list = bulb_toggles
+    colour_list: list = all_colours
 
 class XmasSceneClass(BaseModel):
     wait_time: int = 600
 
 # the bulb lists and colours are examples, which starts a scene by default
 class MultiColourSceneClass(BaseModel):
-    bulb_lists: list = [[DEN_LIGHT, CHAIR_LIGHT, SOFA_LIGHT],
-                       [WHITE_LAMP, WOOD_LAMP, BLACK_LAMP]]
+    wait_time: int = 600
+    bulb_lists: list = [[DEN_LIGHT, CHAIR_LIGHT, SOFA_LIGHT, BLACK_LAMP],
+                       [WHITE_LAMP, WOOD_LAMP]]
     colour_list: list = [Colours.ORANGE,
                          Colours.ROSE,
                          Colours.AZURE,
                          Colours.CHARTRUESE,
                          Colours.VIOLET]
-    wait_time: int = 600
 
 # Scenes
 
@@ -235,7 +249,7 @@ async def random_colour_scene(random_class: RandomColourSceneClass):
         for this_bulb in bulbs:
             for this_toggle in random_class.toggles:
                 if this_toggle['name'] == this_bulb.name and this_toggle['toggle'] == True:
-                    ran_col = choice(Colours.ALL_COLOURS)
+                    ran_col = choice(random_class.colour_list)
                     this_bulb.bulb.set_colour(ran_col["red"], ran_col["green"], ran_col["blue"])
                     print("{} set to ({}, {}, {})"
                           .format(this_bulb.name, ran_col["red"], ran_col["green"], ran_col["blue"]))
