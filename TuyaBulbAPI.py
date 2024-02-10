@@ -77,6 +77,7 @@ set_bulb_retry_limit(RETRY_LIMIT)
 
 class BulbToggle(BaseModel):
     name: str = ""
+    bright_mul: float = 1.0
     toggle: bool = True
 
 class MultiRgbToggle(BulbToggle):
@@ -96,6 +97,7 @@ all_colours: RgbColour = []
 for this_bulb in bulbs:
     bulb_toggles.append(BulbToggle(
         name=this_bulb.name,
+        bright_mul = 1.0,
         toggle=True
     ))
     multi_rgb_toggles.append(MultiRgbToggle(
@@ -153,6 +155,38 @@ class MultiColourSceneClass(BaseModel):
                          Colours.AZURE,
                          Colours.CHARTRUESE,
                          Colours.VIOLET]
+
+# Shared functions
+
+# Calulates final colours based on brighness multiplier
+# Will only multiply up to the point that the colours start changing
+# For example, (128, 64, 0) will top out at *2 multiplier, and
+# (10, 5, 0) will bottom out at *0.2 multiplier (this is just an
+# example - setting this low will probably result in darkness)
+    
+def get_final_colours(red, green, blue, init_mul):
+    init_cols = [red, green, blue]
+    final_cols = [red, green, blue]
+    
+    if init_mul > 1:
+        high_num = max(red, green, blue)
+        max_mul = round(256 / high_num, 2)
+        for i in range(len(final_cols)):
+            mul = min(init_mul, max_mul)
+            final_cols[i] = int(min(init_cols[i] * mul, 255))
+
+    elif init_mul < 1:
+        non_zeros = []
+        for val in (red, green, blue):
+            if val != 0:
+                non_zeros.append(val)
+        low_num = min(non_zeros)
+        min_mul = round(1 / low_num, 2)
+        for i in range(len(final_cols)):
+            mul = max(init_mul, min_mul)
+            final_cols[i] = int(init_cols[i] * mul)
+
+    return final_cols
 
 # Scenes
 
@@ -283,7 +317,10 @@ def set_bulb_colour(rgb: RgbClass):
     for this_bulb in bulbs:
         for this_toggle in rgb.toggles:
             if this_toggle['name'] == this_bulb.name and this_toggle['toggle'] == True:
-                this_bulb.bulb.set_colour(rgb.red, rgb.green, rgb.blue)
+                final_cols = get_final_colours(rgb.red, rgb.green, rgb.blue, this_toggle['bright_mul'])
+                this_bulb.bulb.set_colour(final_cols[0], final_cols[1], final_cols[2])
+                print("{} set to ({}, {}, {})".format(this_toggle['name'],
+                      final_cols[0], final_cols[1], final_cols[2]))
 
     return "Colour changed to ({}, {}, {})".format(rgb.red, rgb.green, rgb.blue)
 
@@ -334,7 +371,6 @@ def start_multi_colour_scene(multi_class: MultiColourSceneClass, background_task
     return "Multi Colour Scene started" if duplicate_bulb == "" else "{} appears on multiple lists".format(duplicate_bulb)
 
 # This one picks a random colour for each selected bulb at the selected wait time
-# For now, it uses the entire list of colours, but the option to toggle them will be added
 
 @app.post("/start_random_colour_scene")
 def start_random_colour_scene(random_class: RandomColourSceneClass, background_tasks: BackgroundTasks):
