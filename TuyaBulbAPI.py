@@ -93,6 +93,7 @@ class RgbColour(BaseModel):
 bulb_toggles : BulbToggle = []
 multi_rgb_toggles : MultiRgbToggle = []
 all_colours: RgbColour = []
+multi_scene_toggles = [[],[]]
 
 for this_bulb in bulbs:
     bulb_toggles.append(BulbToggle(
@@ -106,6 +107,24 @@ for this_bulb in bulbs:
         green = 0,
         blue = 0
     ))
+    if this_bulb.name == "Black Lamp":
+        multi_scene_toggles[0].append(BulbToggle(
+            name=this_bulb.name,
+            bright_mul=0.5,
+            toggle=True
+        ))
+    elif "Light" in this_bulb.name:
+        multi_scene_toggles[0].append(BulbToggle(
+            name=this_bulb.name,
+            bright_mul=2.0,
+            toggle=True
+        ))
+    else:
+        multi_scene_toggles[1].append(BulbToggle(
+            name=this_bulb.name,
+            bright_mul=1.0,
+            toggle=True
+        ))
 
 for col in Colours.ALL_COLOURS:
     all_colours.append(RgbColour(
@@ -155,6 +174,24 @@ class MultiColourSceneClass(BaseModel):
                          Colours.AZURE,
                          Colours.CHARTRUESE,
                          Colours.VIOLET]
+
+class MultiColourSceneClassNew(BaseModel):
+    global multi_scene_toggles
+    wait_time: int = 600
+    bulb_lists: list = multi_scene_toggles
+    colour_list: list = [Colours.ORANGE,
+                         Colours.ROSE,
+                         Colours.AZURE,
+                         Colours.CHARTRUESE,
+                         Colours.VIOLET]
+
+    # def __init__(self):
+    #     for this_toggle in bulb_toggles:
+    #         if "Light" in this_toggle.name:
+    #             self.bulb_lists[0][0].append(this_toggle)
+    #         else:
+    #             self.bulb_lists[0][1].append(this_toggle)
+
 
 # Shared functions
 
@@ -221,6 +258,7 @@ async def xmas_scene(wait_time: int):
     set_bulb_retry_limit(1)
 
 async def multi_colour_scene(multi_class: MultiColourSceneClass):
+
     scene_id = random()
     current_time = time()
     colour_offsets = []
@@ -261,6 +299,74 @@ async def multi_colour_scene(multi_class: MultiColourSceneClass):
             print ("Offset {} final: {}".format(str(i), str(colour_offsets[i])))
 
         print("Offsets: {}".format(colour_offsets))
+        print()
+
+        while time() - current_time < multi_class.wait_time and scene_id in running_scenes:
+            await asyncio.sleep(0.1)
+        current_time = time()
+
+    print("{} : Wait {} : Stopped at {}"
+          .format("multi_colour_scene", multi_class.wait_time, ctime(current_time)))
+    set_bulb_retry_limit(1)
+
+async def multi_colour_scene_new(multi_class: MultiColourSceneClassNew):
+
+    scene_id = random()
+    current_time = time()
+    colour_offsets = []
+    b_list_length = len(multi_class.bulb_lists)
+    c_list_length = len(multi_class.colour_list)
+    print("{} : Wait {} : Started at {}"
+          .format("multi_colour_scene", multi_class.wait_time, ctime(current_time)))
+    running_scenes.append(scene_id)
+    set_bulb_retry_limit(10)
+
+    for i in range(b_list_length):
+        colour_offsets.append(i)
+    
+    if c_list_length < b_list_length:
+        for x in range(b_list_length - c_list_length):
+            multi_class.colour_list.append(Colours.WHITE)
+            c_list_length = len(multi_class.colour_list)
+
+# Just here for demonstration purposes
+            
+# @app.put("/set_colour")
+# def set_bulb_colour(rgb: RgbClass):
+#     stop_scenes()
+#     for this_bulb in bulbs:
+#         for this_toggle in rgb.toggles:
+#             if this_toggle['name'] == this_bulb.name and this_toggle['toggle'] == True:
+#                 final_cols = get_final_colours(rgb.red, rgb.green, rgb.blue, this_toggle['bright_mul'])
+#                 this_bulb.bulb.set_colour(final_cols[0], final_cols[1], final_cols[2])
+#                 print("{} set to ({}, {}, {})".format(this_toggle['name'],
+#                       final_cols[0], final_cols[1], final_cols[2]))
+
+#     return "Colour changed to ({}, {}, {})".format(rgb.red, rgb.green, rgb.blue)
+    
+    # yeah, there are C-stye loops here. I have to sync up two lists and just find this way easier
+    # there are also a bunch of print lines for debugging, but they can be removed if desired
+    while scene_id in running_scenes:
+        for i in range(b_list_length):
+            for j in multi_class.bulb_lists[i]:
+                for this_bulb in bulbs:
+                    if this_bulb.name == j['name']:
+                        col = multi_class.colour_list[colour_offsets[i]]
+                        final_cols = get_final_colours(col['red'], col['green'], col['blue'], j['bright_mul'])
+                        this_bulb.bulb.set_colour(final_cols[0], final_cols[1], final_cols[2])
+                        print("{} set to ({}, {}, {})".format(this_bulb.name, final_cols[0], final_cols[1], final_cols[2]))
+ 
+        count = 0
+
+        for i in range(len(colour_offsets)):
+            # print ("Offset {} start: {}".format(str(i), str(colour_offsets[i])))
+            colour_offsets[i] = colour_offsets[i] + 1
+            # print ("Offset {} + 1: {}".format(str(i), str(colour_offsets[i])))
+            if colour_offsets[i] >= c_list_length:
+                colour_offsets[i] = 0
+            # print ("Offset {} final: {}".format(str(i), str(colour_offsets[i])))
+
+        # print("Offsets: {}".format(colour_offsets))
         print()
 
         while time() - current_time < multi_class.wait_time and scene_id in running_scenes:
@@ -367,6 +473,22 @@ def start_multi_colour_scene(multi_class: MultiColourSceneClass, background_task
     if duplicate_bulb == "":
         stop_scenes()
         background_tasks.add_task(multi_colour_scene, multi_class)
+
+    return "Multi Colour Scene started" if duplicate_bulb == "" else "{} appears on multiple lists".format(duplicate_bulb)
+
+@app.post("/start_multi_colour_scene_new")
+def start_multi_colour_scene_new(multi_class: MultiColourSceneClassNew, background_tasks: BackgroundTasks):
+    # Check that no lights appear in multiple lists
+    duplicate_bulb = ""
+    for i in range(len(multi_class.bulb_lists)):
+        for j in range(len(multi_class.bulb_lists)):
+            for bulb in multi_class.bulb_lists[i]:
+                if bulb in multi_class.bulb_lists[j] and i != j:
+                    duplicate_bulb = bulb
+
+    if duplicate_bulb == "":
+        stop_scenes()
+        background_tasks.add_task(multi_colour_scene_new, multi_class)
 
     return "Multi Colour Scene started" if duplicate_bulb == "" else "{} appears on multiple lists".format(duplicate_bulb)
 
