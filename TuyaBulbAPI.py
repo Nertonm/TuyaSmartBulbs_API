@@ -96,11 +96,11 @@ all_colours: RgbColour = []
 multi_scene_toggles = [[],[]]
 
 for this_bulb in bulbs:
-    bulb_toggles.append(BulbToggle(
-        name=this_bulb.name,
-        bright_mul = 1.0,
-        toggle=True
-    ))
+    # bulb_toggles.append(BulbToggle(
+    #     name=this_bulb.name,
+    #     bright_mul = 1.0,
+    #     toggle=True
+    # ))
     multi_rgb_toggles.append(MultiRgbToggle(
         name=this_bulb.name,
         red = 0,
@@ -113,18 +113,33 @@ for this_bulb in bulbs:
             bright_mul=0.5,
             toggle=True
         ))
+        bulb_toggles.append(BulbToggle(
+        name=this_bulb.name,
+        bright_mul = 0.5,
+        toggle=True
+    ))
     elif "Light" in this_bulb.name:
         multi_scene_toggles[0].append(BulbToggle(
             name=this_bulb.name,
             bright_mul=2.0,
             toggle=True
         ))
+        bulb_toggles.append(BulbToggle(
+        name=this_bulb.name,
+        bright_mul = 2.0,
+        toggle=True
+    ))
     else:
         multi_scene_toggles[1].append(BulbToggle(
             name=this_bulb.name,
             bright_mul=1.0,
             toggle=True
         ))
+        bulb_toggles.append(BulbToggle(
+        name=this_bulb.name,
+        bright_mul = 1.0,
+        toggle=True
+    ))
 
 for col in Colours.ALL_COLOURS:
     all_colours.append(RgbColour(
@@ -328,21 +343,6 @@ async def multi_colour_scene_new(multi_class: MultiColourSceneClassNew):
         for x in range(b_list_length - c_list_length):
             multi_class.colour_list.append(Colours.WHITE)
             c_list_length = len(multi_class.colour_list)
-
-# Just here for demonstration purposes
-            
-# @app.put("/set_colour")
-# def set_bulb_colour(rgb: RgbClass):
-#     stop_scenes()
-#     for this_bulb in bulbs:
-#         for this_toggle in rgb.toggles:
-#             if this_toggle['name'] == this_bulb.name and this_toggle['toggle'] == True:
-#                 final_cols = get_final_colours(rgb.red, rgb.green, rgb.blue, this_toggle['bright_mul'])
-#                 this_bulb.bulb.set_colour(final_cols[0], final_cols[1], final_cols[2])
-#                 print("{} set to ({}, {}, {})".format(this_toggle['name'],
-#                       final_cols[0], final_cols[1], final_cols[2]))
-
-#     return "Colour changed to ({}, {}, {})".format(rgb.red, rgb.green, rgb.blue)
     
     # yeah, there are C-stye loops here. I have to sync up two lists and just find this way easier
     # there are also a bunch of print lines for debugging, but they can be removed if desired
@@ -388,11 +388,11 @@ async def random_colour_scene(random_class: RandomColourSceneClass):
     while scene_id in running_scenes:
         for this_bulb in bulbs:
             for this_toggle in random_class.toggles:
-                if this_toggle['name'] == this_bulb.name and this_toggle['toggle'] == True:
+                if this_toggle['name'] == this_bulb.name:
                     ran_col = choice(random_class.colour_list)
-                    this_bulb.bulb.set_colour(ran_col["red"], ran_col["green"], ran_col["blue"])
-                    print("{} set to ({}, {}, {})"
-                          .format(this_bulb.name, ran_col["red"], ran_col["green"], ran_col["blue"]))
+                    final_cols = get_final_colours(ran_col['red'], ran_col['green'], ran_col['blue'], this_toggle['bright_mul'])
+                    this_bulb.bulb.set_colour(final_cols[0], final_cols[1], final_cols[2])
+                    print("{} set to ({}, {}, {})".format(this_bulb.name, final_cols[0], final_cols[1], final_cols[2]))
                     
         print()
         while time() - current_time < random_class.wait_time and scene_id in running_scenes:
