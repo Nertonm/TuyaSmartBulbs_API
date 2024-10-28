@@ -26,7 +26,7 @@ app = FastAPI()
 #   has previously been run successfully, and device keys obtained
 # See https://pypi.org/project/tinytuya/#description for more information
 
-CON_TIMEOUT = 2
+CON_TIMEOUT = 10
 RETRY_LIMIT = 1
 
 # Let's get the bulb names right, as they are sometimes used
@@ -92,6 +92,10 @@ class RgbColour(BaseModel):
     
 class LightningToggle(BaseModel):
     name: str = ""
+    # red: int = 255
+    # green: int = 255
+    # blue: int = 255
+    # colour: RgbColour = Colours.WHITE
 
 bulb_toggles : BulbToggle = []
 multi_rgb_toggles : MultiRgbToggle = []
@@ -145,20 +149,21 @@ for this_bulb in bulbs:
 # set up lightning toggles
 
 for this_bulb in bulbs:
-    if this_bulb.name == BLACK_LAMP:
+    if this_bulb.name == DEN_LIGHT:
         lightning_toggles.append(LightningToggle(
             name=this_bulb.name,
-            delay=0.0
         ))
     elif this_bulb.name == WHITE_LAMP:
         lightning_toggles.append(LightningToggle(
             name=this_bulb.name,
-            delay=0.3
         ))
     elif this_bulb.name == WOOD_LAMP:
         lightning_toggles.append(LightningToggle(
             name=this_bulb.name,
-            delay=0.6
+        ))
+    elif this_bulb.name == BLACK_LAMP:
+        lightning_toggles.append(LightningToggle(
+            name=this_bulb.name,
         ))
 
 for col in Colours.ALL_COLOURS:
@@ -511,7 +516,6 @@ async def lightning_scene_async(lightning_class: LightningSceneClass):
         rand_wait = randrange((lightning_class.wait_time_range[0] * 1000),
                              (lightning_class.wait_time_range[1] * 1000))/1000
         
-        # rand_wait = randrange(1, 4)/4 # change these magic numbers
         rand_strike_number = randrange(0, int((100 / lightning_class.lightning_percent_chance)))
         lightning_happening = (rand_strike_number == 0)
     
@@ -519,38 +523,19 @@ async def lightning_scene_async(lightning_class: LightningSceneClass):
         print(str(rand_strike_number))
         print ("Strike happening: " + str(lightning_happening))
         
-        # if(lightning_happening):
-        #     for i in range(len(lightning_bulbs)):
-        #         bulb_tasks.append(asyncio.to_thread(lightning_flash,
-        #                                             lightning_bulbs[i],
-        #                                             i,
-        #                                             lightning_class.lightning_flash_brightness,
-        #                                             lightning_class.lightning_length,
-        #                                             lightning_class.default_brightness,
-        #                                             lightning_class.flash_delay,
-        #                                             lightning_delays[i]))
-        #     await asyncio.gather(*bulb_tasks)
-        #     bulb_tasks.clear()
-        #     sleep(lightning_class.lightning_length)
-        
         if(lightning_happening):
             await asyncio.to_thread(lightning_flash_alt, lightning_bulbs,
                                                   lightning_class.lightning_colour,
                                                   lightning_class.lightning_length,
                                                   lightning_class.default_brightness)
             
-            # bulb_tasks.append(asyncio.to_thread)
-            
             while time() - current_time < lightning_class.lightning_length and scene_id in running_scenes:
                 await asyncio.sleep(0.1)
             current_time = time()
-            
-            # while scene_id in running_scenes:
-            #     sleep(lightning_class.lightning_length)
                    
         else:
             lightning_bulbs[0].bulb.set_colour(rand_brightness, rand_brightness, rand_brightness)
-            sleep(rand_wait/wait_divider)
+            await asyncio.sleep(rand_wait/wait_divider)
             lightning_bulbs[0].bulb.set_colour(lightning_class.default_brightness,
                                           lightning_class.default_brightness,
                                           lightning_class.default_brightness)
@@ -563,7 +548,7 @@ async def lightning_scene_async(lightning_class: LightningSceneClass):
                 await asyncio.sleep(0.1)
             current_time = time()
             
-            sleep(rand_wait)
+            await asyncio.sleep(rand_wait)
             
     print("{} : Stopped at {}"
           .format("lightning_scene", ctime(current_time)))
